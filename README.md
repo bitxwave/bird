@@ -8,11 +8,11 @@ This repo provides a minimal Docker image for **BIRD**, the widely used BGP/OSPF
 
 ### Features
 
-- **Multi-version**: Build with any BIRD release from [bird.network.cz](https://bird.network.cz/download/) (e.g. 2.0.10, 3.0.1) via build-arg.
+- **Multi-version**: Build any BIRD release (e.g. 2.0.10, 3.0.1) via build-arg — sources come from the official release tarball, falling back to the [upstream git archive](https://gitlab.nic.cz/labs/bird) when it is unreachable.
 - **Multi-arch**: Image is built for `linux/amd64` and `linux/arm64`; the correct variant is pulled automatically.
 - **Slim**: Multi-stage build; only runtime deps in the final image.
 - **Non-root**: Runs as user `bird`; the `bird` binary has file capabilities (`cap_net_raw`, `cap_net_admin`) so OSPF/BGP work without root.
-- **Config-friendly**: Mount your own `bird.conf`; if missing, an example config is used and control socket + syslog are appended.
+- **Config-friendly**: Mount your own `bird.conf`; if missing, the example config is used with stderr logging appended so `docker logs` works.
 - **Healthcheck**: Built-in healthcheck using `birdc show status`.
 
 ### Image
@@ -59,7 +59,7 @@ Volumes:
 - `/etc/bird` — config directory (mount your `bird.conf` here if needed).
 - `/var/run/bird` — runtime (control socket, etc.).
 
-If `/etc/bird/bird.conf` is missing at startup, the entrypoint copies the example config and appends control socket and syslog settings.
+If `/etc/bird/bird.conf` is missing at startup, the entrypoint copies the example config and appends `log stderr all;`. The control socket path is passed to BIRD with `-s`, not set in the config file.
 
 ### Building locally
 
@@ -71,7 +71,7 @@ docker build -t bird:local .
 docker build -t bird:2.0.10 --build-arg BIRD_VERSION=2.0.10 .
 ```
 
-Tag must be a valid semver `x.y.z` matching a release on [bird.network.cz/download](https://bird.network.cz/download/).
+Tag must be a valid semver `x.y.z` matching an upstream BIRD release tag (see [release tags](https://gitlab.nic.cz/labs/bird/-/tags)).
 
 ### Versions and CI
 

@@ -11,11 +11,11 @@
 
 ### 特性
 
-- **多版本**：通过构建参数指定 [bird.network.cz](https://bird.network.cz/download/) 上的任意发布版本（如 2.0.10、3.0.1）。
+- **多版本**：通过构建参数指定任意发布版本（如 2.0.10、3.0.1）；源码优先取官方发布 tarball，不可达时回退到[上游 git 归档](https://gitlab.nic.cz/labs/bird)。
 - **多架构**：镜像提供 `linux/amd64` 与 `linux/arm64`，拉取时会自动匹配当前架构。
 - **精简**：多阶段构建，最终镜像仅包含运行时依赖。
 - **非 root**：以用户 `bird` 运行；`bird` 二进制已设置文件能力（`cap_net_raw`、`cap_net_admin`），无需 root 即可跑 OSPF/BGP。
-- **配置友好**：可挂载自己的 `bird.conf`；若不存在则使用示例配置并自动追加控制套接字与 syslog 配置。
+- **配置友好**：可挂载自己的 `bird.conf`；若不存在则使用示例配置，并追加 stderr 日志配置，保证 `docker logs` 能看到输出。
 - **健康检查**：内置通过 `birdc show status` 的健康检查。
 
 ### 镜像
@@ -62,7 +62,7 @@ docker run -d --name bird \
 - `/etc/bird` — 配置目录（可在此挂载自己的 `bird.conf`）。
 - `/var/run/bird` — 运行时目录（控制套接字等）。
 
-若启动时不存在 `/etc/bird/bird.conf`，入口脚本会从示例配置复制并追加控制套接字与 syslog 配置。
+若启动时不存在 `/etc/bird/bird.conf`，入口脚本会从示例配置复制并追加 `log stderr all;`。控制套接字路径由 `-s` 参数传给 BIRD，不写在配置文件里。
 
 ### 本地构建
 
@@ -74,7 +74,7 @@ docker build -t bird:local .
 docker build -t bird:2.0.10 --build-arg BIRD_VERSION=2.0.10 .
 ```
 
-版本号须为 [bird.network.cz/download](https://bird.network.cz/download/) 上存在的 `x.y.z` 格式发布版本。
+版本号须为上游存在的 `x.y.z` 格式发布版本（见[发布 tag 列表](https://gitlab.nic.cz/labs/bird/-/tags)）。
 
 ### 版本与 CI
 
