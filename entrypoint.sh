@@ -15,10 +15,12 @@ trap 'log "Stopping BIRD gracefully..."; if birdc -s "${BIRD_CTL}" show status >
 if [ ! -f "${BIRD_CONF}" ]; then
     log "WARNING: ${BIRD_CONF} not found, using example config"
     cp "${BIRD_EXAMPLE_CONF}" "${BIRD_CONF}"
+    # The control socket comes from -s below, not from the config file. The
+    # example config logs to syslog, which no container runs; send BIRD's own
+    # log to stderr as well so `docker logs` shows something.
     cat >> "${BIRD_CONF}" << EOF
 
-control socket "${BIRD_CTL}" allow localhost;
-log syslog all;
+log stderr all;
 EOF
 fi
 
