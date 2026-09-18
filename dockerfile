@@ -7,27 +7,40 @@ ARG BIRD_VERSION
 RUN apt update \
   && apt install -y --no-install-recommends \
       ca-certificates \
-      make curl build-essential bison m4 flex \
+      make curl build-essential bison m4 flex autoconf \
       libncurses5-dev libreadline-dev libssh-dev pkg-config \
   && rm -rf /var/lib/apt/lists/*
 
-RUN BIRD_VERSION="${BIRD_VERSION:-3.0.1}"; \
-    if [ -z "${BIRD_VERSION}" ] || ! echo "${BIRD_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then \
-        echo "WARNING: Invalid BIRD_VERSION, fallback to 3.0.1"; \
-        BIRD_VERSION=3.0.1; \
-    fi && \
-    export BIRD_VERSION && \
-    export BIRD_TAR="bird-${BIRD_VERSION}.tar.gz" && \
-    export BIRD_URL="https://bird.network.cz/download/${BIRD_TAR}" && \
-    curl -fsSL -O "${BIRD_URL}" && \
-    ( curl -fsSL -O "${BIRD_URL}.sha256" 2>/dev/null && \
-      ( echo "Verifying ${BIRD_TAR}..." && sha256sum -c "${BIRD_TAR}.sha256" ) || ( echo "ERROR: Checksum failed!" && exit 1 ) \
-    ) || echo "WARNING: Checksum file not found, skip verification" && \
-    tar -zxf "${BIRD_TAR}" -C /tmp && \
-    mv "/tmp/bird-${BIRD_VERSION}" /bird && \
-    rm -rf "${BIRD_TAR}" "${BIRD_TAR}.sha256" /tmp/*
+# Source of truth is the official release tarball; bird.network.cz/download has
+# been answering 403 since 2026-09, so fall back to the upstream git archive.
+RUN set -eu; \
+    if ! echo "${BIRD_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then \
+        echo "ERROR: BIRD_VERSION must be x.y.z, got '${BIRD_VERSION}'" >&2; \
+        exit 1; \
+    fi; \
+    BIRD_TAR="bird-${BIRD_VERSION}.tar.gz"; \
+    RELEASE_URL="https://bird.network.cz/download/${BIRD_TAR}"; \
+    GIT_URL="https://gitlab.nic.cz/labs/bird/-/archive/v${BIRD_VERSION}/bird-v${BIRD_VERSION}.tar.gz"; \
+    cd /tmp; \
+    if curl -fsSL -o "${BIRD_TAR}" "${RELEASE_URL}"; then \
+        echo "Fetched release tarball ${RELEASE_URL}"; \
+        if curl -fsSL -o "${BIRD_TAR}.sha256" "${RELEASE_URL}.sha256"; then \
+            echo "Verifying ${BIRD_TAR}..."; \
+            sha256sum -c "${BIRD_TAR}.sha256"; \
+        else \
+            echo "WARNING: no ${BIRD_TAR}.sha256 published, skipping verification"; \
+        fi; \
+    else \
+        echo "WARNING: ${RELEASE_URL} unavailable, falling back to ${GIT_URL}"; \
+        curl -fsSL -o "${BIRD_TAR}" "${GIT_URL}"; \
+    fi; \
+    mkdir -p /bird; \
+    tar -zxf "${BIRD_TAR}" -C /bird --strip-components=1; \
+    rm -f "${BIRD_TAR}" "${BIRD_TAR}.sha256"
 
+# Git archives ship configure.ac only; release tarballs already carry configure.
 RUN cd /bird \
+  && if [ ! -x ./configure ]; then autoreconf; fi \
   && ./configure \
         --prefix=/usr \
         --sysconfdir=/etc/bird \
